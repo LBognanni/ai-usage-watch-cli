@@ -80,9 +80,7 @@ func Display(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 			used := math.Max(0, math.Min(100, w.Used))
 			filled := int(math.Round(used / 5))
 			bar := strings.Repeat("█", filled) + strings.Repeat("░", 20-filled)
-			if color {
-				bar = colorUsage(bar, used)
-			}
+			bar = renderUsageBar([]rune(bar), filled, used, color, false)
 			reset := "reset unknown"
 			if !w.ResetsAt.IsZero() {
 				if w.ResetsAt.Sub(now) < 24*time.Hour {
@@ -184,13 +182,19 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 	}
 	start := (width - len(label)) / 2
 	copy(bar[start:], label)
+	return renderUsageBar(bar, filled, used, color, w == nil || !validWindow(*w, now))
+}
+
+// Both views use exactly the same cell backgrounds and palette. Text replaces
+// only the foreground character, never the progress underneath it.
+func renderUsageBar(bar []rune, filled int, used float64, color, unknown bool) string {
 	if !color {
 		return string(bar)
 	}
 	var b strings.Builder
 	previous := ""
-	bright, dark := compactPalette(used)
-	if w == nil || !validWindow(*w, now) {
+	bright, dark := usagePalette(used)
+	if unknown {
 		dark = "43;43;43"
 	}
 	for i, cell := range bar {
@@ -200,7 +204,7 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 		if i < filled {
 			fg, bg = 30, bright
 		}
-		if i < start || i >= start+len(label) {
+		if cell == '█' || cell == '░' {
 			cell = ' '
 		}
 		style := fmt.Sprintf("\x1b[%d;48;2;%sm", fg, bg)
@@ -216,29 +220,15 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 
 // Truecolor backgrounds are independent of the terminal's ANSI theme. The
 // unused portion is a dark tint of the filled portion, not a separate gray box.
-func compactPalette(used float64) (bright, dark string) {
-	switch usageColor(used) {
-	case 31:
+func usagePalette(used float64) (bright, dark string) {
+	switch {
+	case used >= 90:
 		return "230;85;78", "58;23;21"
-	case 33:
+	case used >= 70:
 		return "229;192;54", "57;47;15"
 	default:
 		return "176;224;48", "43;53;13"
 	}
-}
-
-func colorUsage(bar string, used float64) string {
-	return fmt.Sprintf("\x1b[%dm%s\x1b[0m", usageColor(used), bar)
-}
-
-func usageColor(used float64) int {
-	code := 32
-	if used >= 90 {
-		code = 31
-	} else if used >= 70 {
-		code = 33
-	}
-	return code
 }
 
 func freshnessFooter(s quota.Snapshot, ids []string, now time.Time) string {

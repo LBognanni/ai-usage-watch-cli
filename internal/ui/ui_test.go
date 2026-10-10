@@ -161,18 +161,24 @@ func TestCompactColorsMatchFullView(t *testing.T) {
 	now := time.Now()
 	for _, tt := range []struct {
 		used   float64
-		code   string
 		bright string
 		dark   string
-	}{{20, "32", "176;224;48", "43;53;13"}, {75, "33", "229;192;54", "57;47;15"}, {95, "31", "230;85;78", "58;23;21"}} {
+	}{{20, "176;224;48", "43;53;13"}, {69.9, "176;224;48", "43;53;13"}, {70, "229;192;54", "57;47;15"}, {89.9, "229;192;54", "57;47;15"}, {90, "230;85;78", "58;23;21"}, {95, "230;85;78", "58;23;21"}} {
 		s := quota.Snapshot{Providers: []quota.Provider{{ID: "claude", Status: "live", CheckedAt: now, Windows: []quota.Window{{Label: "5-hour", Used: tt.used, ResetsAt: now.Add(time.Hour)}}}}}
 		compact := Compact(s, []string{"claude"}, now, time.Minute, true)
 		if !strings.Contains(compact, "48;2;"+tt.bright+"m") || !strings.Contains(compact, "48;2;"+tt.dark+"m") || !strings.Contains(compact, "\x1b[0m") {
 			t.Fatal(compact)
 		}
 		full := Display(s, []string{"claude"}, now, time.Minute, true)
-		if !strings.Contains(full, "\x1b["+tt.code+"m") {
+		if !strings.Contains(full, "48;2;"+tt.bright+"m") || !strings.Contains(full, "48;2;"+tt.dark+"m") || !strings.Contains(full, "\x1b[0m") {
 			t.Fatal(full)
+		}
+		// The shared renderer must preserve identical style transitions at the
+		// fill boundary, whether or not a countdown overlays the cells.
+		styles := regexp.MustCompile(`\x1b\[[0-9;]+m`)
+		compactBarOnly := compactBar(&s.Providers[0].Windows[0], now, false, true)
+		if strings.Join(styles.FindAllString(compactBarOnly, -1), "") != strings.Join(styles.FindAllString(full, -1), "") {
+			t.Fatal("view palettes or fill boundaries differ")
 		}
 		plain := Compact(s, []string{"claude"}, now, time.Minute, false)
 		if strings.Contains(plain, "\x1b") || strings.Contains(plain, "-") || !strings.Contains(plain, "░") {
