@@ -25,21 +25,41 @@ func TestCountdownBackgroundCrossesFillBoundary(t *testing.T) {
 	bar := compactBar(&w, now, false, true)
 	// At 50%, the first two countdown characters sit on the consumed green
 	// region; the last two sit on the remaining dark region.
-	if !strings.Contains(bar, "\x1b[30;42m3:\x1b[97;40m33") {
+	if !strings.Contains(bar, "\x1b[30;48;2;176;224;48m") || !strings.Contains(bar, "3:\x1b[97;48;2;43;53;13m33") {
 		t.Fatal(bar)
 	}
 	strip := regexp.MustCompile(`\x1b\[[0-9;]+m`)
-	if strip.ReplaceAllString(bar, "") != compactBar(&w, now, false, false) {
+	plain := strings.Map(func(r rune) rune {
+		if r == '█' || r == '░' {
+			return ' '
+		}
+		return r
+	}, compactBar(&w, now, false, false))
+	if strip.ReplaceAllString(bar, "") != plain {
 		t.Fatal("color changed visible content or width")
 	}
 	for _, tt := range []struct {
 		used  float64
 		style string
-	}{{0, "\x1b[97;40m3:33"}, {100, "\x1b[30;41m3:33"}} {
+	}{{0, "\x1b[97;48;2;43;53;13m"}, {100, "\x1b[30;48;2;230;85;78m"}} {
 		w.Used = tt.used
 		if bar := compactBar(&w, now, false, true); !strings.Contains(bar, tt.style) {
 			t.Fatal(bar)
 		}
+	}
+}
+
+func TestColoredCompactBarHasUniformBackgroundUnderText(t *testing.T) {
+	now := time.Now()
+	w := quota.Window{Used: 20, ResetsAt: now.Add(time.Hour)}
+	bar := compactBar(&w, now, false, true)
+	// Exactly one background transition: lime consumed cells, then a single
+	// olive background spanning the remaining cells AND the countdown.
+	if strings.Count(bar, "48;2;") != 2 || !strings.Contains(bar, "1:00") || strings.ContainsAny(bar, "█░") {
+		t.Fatal(bar)
+	}
+	if strings.Contains(bar, ";40m") || strings.Contains(bar, ";100m") {
+		t.Fatal("separate gray/black text background")
 	}
 }
 
@@ -140,12 +160,14 @@ func TestCompactBar(t *testing.T) {
 func TestCompactColorsMatchFullView(t *testing.T) {
 	now := time.Now()
 	for _, tt := range []struct {
-		used float64
-		code string
-	}{{20, "32"}, {75, "33"}, {95, "31"}} {
+		used   float64
+		code   string
+		bright string
+		dark   string
+	}{{20, "32", "176;224;48", "43;53;13"}, {75, "33", "229;192;54", "57;47;15"}, {95, "31", "230;85;78", "58;23;21"}} {
 		s := quota.Snapshot{Providers: []quota.Provider{{ID: "claude", Status: "live", CheckedAt: now, Windows: []quota.Window{{Label: "5-hour", Used: tt.used, ResetsAt: now.Add(time.Hour)}}}}}
 		compact := Compact(s, []string{"claude"}, now, time.Minute, true)
-		if !strings.Contains(compact, "\x1b["+tt.code+";") || !strings.Contains(compact, "\x1b[0m") {
+		if !strings.Contains(compact, "48;2;"+tt.bright+"m") || !strings.Contains(compact, "48;2;"+tt.dark+"m") || !strings.Contains(compact, "\x1b[0m") {
 			t.Fatal(compact)
 		}
 		full := Display(s, []string{"claude"}, now, time.Minute, true)

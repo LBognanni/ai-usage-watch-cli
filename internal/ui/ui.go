@@ -189,21 +189,21 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 	}
 	var b strings.Builder
 	previous := ""
+	bright, dark := compactPalette(used)
+	if w == nil || !validWindow(*w, now) {
+		dark = "43;43;43"
+	}
 	for i, cell := range bar {
 		// Every cell retains its underlying usage background, including text
-		// cells. Change the foreground only to keep the label readable.
-		fg, bg := 90, 40
+		// cells. Solid spaces avoid a different texture behind the countdown.
+		fg, bg := 97, dark
 		if i < filled {
-			fg = usageColor(used)
-			bg = fg + 10
+			fg, bg = 30, bright
 		}
-		if i >= start && i < start+len(label) {
-			fg = 97
-			if i < filled {
-				fg = 30
-			}
+		if i < start || i >= start+len(label) {
+			cell = ' '
 		}
-		style := fmt.Sprintf("\x1b[%d;%dm", fg, bg)
+		style := fmt.Sprintf("\x1b[%d;48;2;%sm", fg, bg)
 		if style != previous {
 			b.WriteString(style)
 			previous = style
@@ -212,6 +212,19 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 	}
 	b.WriteString("\x1b[0m")
 	return b.String()
+}
+
+// Truecolor backgrounds are independent of the terminal's ANSI theme. The
+// unused portion is a dark tint of the filled portion, not a separate gray box.
+func compactPalette(used float64) (bright, dark string) {
+	switch usageColor(used) {
+	case 31:
+		return "230;85;78", "58;23;21"
+	case 33:
+		return "229;192;54", "57;47;15"
+	default:
+		return "176;224;48", "43;53;13"
+	}
 }
 
 func colorUsage(bar string, used float64) string {
