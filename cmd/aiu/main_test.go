@@ -32,7 +32,22 @@ func TestCachedCompact(t *testing.T) {
 	if run(context.Background(), []string{"--compact", "--cached", "--provider=openai"}, &out, &diagnostics) != 0 {
 		t.Fatal(diagnostics.String())
 	}
-	if !strings.Contains(out.String(), "OpenAI (Plus · default)") || !strings.Contains(out.String(), "week 34.0%") || strings.Contains(out.String(), "Claude") {
+	if !strings.Contains(out.String(), "OpenAI Plus") || !strings.Contains(out.String(), "[") || strings.Contains(out.String(), "default") || strings.Contains(out.String(), "%") || strings.Contains(out.String(), "Claude") {
+		t.Fatal(out.String())
+	}
+}
+
+func TestCompactWatchHasNoInstructions(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", dir)
+	t.Setenv("CLAUDE_CONFIG_DIR", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var out, diagnostics bytes.Buffer
+	if run(ctx, []string{"--compact", "--watch", "--provider=claude"}, &out, &diagnostics) != 0 {
+		t.Fatal(diagnostics.String())
+	}
+	if strings.Count(out.String(), "\n") != 1 || !strings.HasPrefix(out.String(), "Claude") || strings.Contains(out.String(), "Refreshing") {
 		t.Fatal(out.String())
 	}
 }

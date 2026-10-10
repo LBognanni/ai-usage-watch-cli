@@ -122,70 +122,70 @@ func Display(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 	return b.String()
 }
 
-// Compact keeps all reported windows and account labels, but removes bars and
-// per-provider healthy timestamps. Parentheses contain reset countdowns.
+// Compact shows only provider/plan names and the main quota bars. Countdown
+// text overlays the bar; no percentages, extra windows, or footer are emitted.
 func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration) string {
 	var b strings.Builder
 	rows := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
 	for _, id := range ids {
 		p := engine.Find(s, id)
 		header := quota.Name(id)
-		var labels []string
+		if id == "copilot" {
+			header = "Copilot"
+		}
 		if p.Plan != "" {
-			labels = append(labels, Clean(p.Plan))
-		}
-		if p.Label != "" {
-			labels = append(labels, Clean(p.Label))
-		}
-		if len(labels) > 0 {
-			header += " (" + strings.Join(labels, " · ") + ")"
+			header += " " + Clean(p.Plan)
 		}
 		var cells []string
 		stale := !p.Fresh(now, maxAge)
-		for _, w := range p.Windows {
-			label := Clean(w.Label)
-			switch label {
-			case "5-hour":
-				label = "5h"
-			case "Weekly":
-				label = "week"
-			case "Monthly":
-				label = "month"
-			}
-			if !validWindow(w, now) {
-				cells = append(cells, label+" ? (elapsed)")
-				continue
-			}
-			prefix := ""
-			if stale {
-				prefix = "~"
-			}
-			reset := "reset unknown"
-			if !w.ResetsAt.IsZero() {
-				reset = duration(w.ResetsAt.Sub(now))
-			}
-			cells = append(cells, fmt.Sprintf("%s %s%.1f%% (%s)", label, prefix, w.Used, reset))
+		labels := []string{"5-hour", "Weekly"}
+		if id == "copilot" {
+			labels = []string{"Monthly"}
 		}
-		if stale && len(p.Windows) > 0 {
-			state := "stale"
-			if p.Status != "live" {
-				state += ": " + Clean(p.Status)
+		for _, label := range labels {
+			var window *quota.Window
+			for i := range p.Windows {
+				if p.Windows[i].Label == label {
+					window = &p.Windows[i]
+					break
+				}
 			}
-			cells = append(cells, state+" · "+age(p, now))
-		} else if p.Status != "live" {
-			state := Clean(p.Status)
-			if p.Message != "" {
-				state += " — " + Clean(p.Message)
-			}
-			cells = append(cells, state)
+			cells = append(cells, compactBar(window, now, stale))
 		}
-		fmt.Fprintf(rows, "%s\t%s\n", header, strings.Join(cells, " · "))
+		fmt.Fprintf(rows, "%s\t%s\n", header, strings.Join(cells, " "))
 	}
 	_ = rows.Flush()
-	if footer := freshnessFooter(s, ids, now); footer != "" {
-		b.WriteString("\n" + footer)
-	}
 	return b.String()
+}
+
+func compactBar(w *quota.Window, now time.Time, stale bool) string {
+	const width = 20
+	bar := []rune(strings.Repeat("-", width))
+	text := "?"
+	if w != nil && validWindow(*w, now) {
+		filled := int(math.Round(math.Max(0, math.Min(100, w.Used)) * width / 100))
+		for i := 0; i < filled; i++ {
+			bar[i] = '█'
+		}
+		if !w.ResetsAt.IsZero() {
+			d := w.ResetsAt.Sub(now)
+			if d < 24*time.Hour {
+				minutes := int(d / time.Minute)
+				text = fmt.Sprintf("%d:%02d", minutes/60, minutes%60)
+			} else {
+				text = duration(d)
+			}
+		}
+		if stale {
+			text = "~" + text
+		}
+	}
+	label := []rune(text)
+	if len(label) > width {
+		label = label[:width]
+	}
+	copy(bar[(width-len(label))/2:], label)
+	return "[" + string(bar) + "]"
 }
 
 func freshnessFooter(s quota.Snapshot, ids []string, now time.Time) string {

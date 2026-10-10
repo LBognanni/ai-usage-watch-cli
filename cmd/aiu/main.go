@@ -28,7 +28,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	flags.SetOutput(diagnostics)
 	watch := flags.Bool("watch", false, "watch quota bars; refresh every interval")
 	status := flags.Bool("status", false, "compact line; refresh stale cache (2s default timeout)")
-	compact := flags.Bool("compact", false, "one row per provider with usage and reset countdowns")
+	compact := flags.Bool("compact", false, "provider/plan and bars with reset countdowns inside")
 	providers := flags.String("provider", "claude,openai,copilot", "comma-separated providers")
 	interval := flags.Duration("interval", 5*time.Minute, "watch network refresh interval")
 	maxAge := flags.Duration("max-age", 5*time.Minute, "maximum cache age for status output")
@@ -136,7 +136,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 		} else {
 			fmt.Fprint(out, ui.Display(snapshot, ids, time.Now(), *maxAge, color))
 		}
-		if *watch {
+		if *watch && !*compact {
 			fmt.Fprintf(out, "\nRefreshing every %s · Ctrl-C to exit\n", *interval)
 		}
 	}

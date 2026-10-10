@@ -45,7 +45,7 @@ For OpenAI and Copilot, `opencode` must be on `PATH`. `aiu` invokes `opencode ap
 ```sh
 aiu                                  # live read, quota bars
 aiu --watch                          # refresh every 5 minutes; Ctrl-C exits
-aiu --compact                        # one row per provider; no bars
+aiu --compact                        # provider/plan and countdown progress bars only
 aiu --compact --watch                # compact live monitor
 aiu --status                         # compact line, refresh only if stale
 aiu --status --cached                 # instant cache-only output
@@ -70,17 +70,17 @@ OpenAI · Plus · default
 updated 2m ago (oldest reading)
 ```
 
-Compact view (`--compact`; parentheses show time until reset):
+Compact view (`--compact`; countdowns are embedded in usage bars):
 
 ```text
-Claude (Pro · Claude Code)  5h 34.0% (2h 18m) · week 53.0% (3d 4h)
-OpenAI (Plus · default)    5h 14.0% (4h 06m) · week 39.0% (5d 11h)
-GitHub Copilot (Business)  month 24.0% (21d 0h)
-
-updated 2m ago (oldest reading)
+Claude Pro        [███████-2:18--------] [███████3d 4h--------]
+OpenAI Plus       [███-----4:06--------] [██████5d 11h--------]
+Copilot Business  [█████-21d 0h--------]
 ```
 
-Both multi-line views use one freshness footer rather than repeating timestamps under healthy providers. Each provider retains its own timestamp internally; stale rows show their individual age and failure state. The footer refers to the oldest displayed reading, not the last refresh attempt. `--compact` works with `--watch`, `--cached`, and provider selection; it cannot be combined with `--status`.
+Compact mode shows **only provider/plan names and bars**: 5-hour then weekly for Claude/OpenAI, monthly for Copilot. Filled cells indicate percentage used; overlaid countdowns use `H:MM` below 24 hours and `Dd Hh` otherwise. Missing or elapsed windows show `?` inside an unfilled bar; `~` marks stale readings. Account labels, additional model windows, percentages, errors, timestamps, and watch instructions are omitted—use the normal view for details. `--compact` works with `--watch`, `--cached`, and provider selection; it cannot be combined with `--status`.
+
+The normal bar view uses one freshness footer rather than repeating timestamps under healthy providers. Each provider retains its own timestamp internally; stale rows show their individual age and failure state. The footer refers to the oldest displayed reading, not the last refresh attempt.
 
 Prompt/status output (`--status`):
 

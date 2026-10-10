@@ -45,13 +45,18 @@ func TestCompact(t *testing.T) {
 		{ID: "openai", Plan: "Plus", Status: "live", CheckedAt: now.Add(-2 * time.Minute), Windows: []quota.Window{{Label: "Weekly", Used: 39}, {Label: "Spark · Weekly", Used: 7}}},
 	}}
 	got := Compact(s, quota.IDs, now, 5*time.Minute)
-	for _, want := range []string{"Claude (Pro · Claude Code)", "5h 34.0% (2h 00m)", "week 53.0% (3d 0h)", "Spark · Weekly 7.0%", "GitHub Copilot", "not connected", "updated 2m ago (oldest reading)"} {
+	for _, want := range []string{"Claude Pro", "2:00", "3d 0h", "OpenAI Plus", "Copilot", "?"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in %s", want, got)
 		}
 	}
-	if strings.Count(got, "updated") != 1 || strings.ContainsAny(got, "█░\x1b") {
+	if strings.Count(got, "[") != 5 || strings.Count(got, "\n") != 3 || strings.ContainsAny(got, "%\x1b") {
 		t.Fatal(got)
+	}
+	for _, forbidden := range []string{"updated", "Claude Code", "default", "Spark", "not connected", "reset", "week"} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("unexpected %q in %s", forbidden, got)
+		}
 	}
 	full := Display(s, quota.IDs, now, 5*time.Minute, false)
 	if strings.Count(full, "updated") != 1 {
@@ -66,15 +71,43 @@ func TestCompactStaleElapsedAndSelection(t *testing.T) {
 		{ID: "openai", Status: "live", CheckedAt: now.Add(-24 * time.Hour), Windows: []quota.Window{{Label: "Weekly", Used: 3}}},
 	}}
 	got := Compact(s, []string{"claude"}, now, 5*time.Minute)
-	for _, want := range []string{"5h ? (elapsed)", "week ~80.0%", "stale: rate limited", "updated 1h 00m ago (oldest reading)"} {
+	for _, want := range []string{"?", "~?"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in %s", want, got)
 		}
 	}
-	if strings.Contains(got, "OpenAI") || strings.Contains(got, "24h") {
+	if strings.Contains(got, "OpenAI") || strings.Contains(got, "rate limited") || strings.Contains(got, "updated") {
 		t.Fatal(got)
 	}
 	if got := Compact(quota.Snapshot{}, []string{"copilot"}, now, time.Minute); strings.Contains(got, "updated") {
 		t.Fatal(got)
+	}
+}
+
+func TestCompactBar(t *testing.T) {
+	now := time.Now()
+	for _, used := range []float64{0, 50, 100} {
+		w := quota.Window{Used: used, ResetsAt: now.Add(3*time.Hour + 33*time.Minute)}
+		bar := compactBar(&w, now, false)
+		if len([]rune(bar)) != 22 || !strings.Contains(bar, "3:33") {
+			t.Fatal(bar)
+		}
+		if used == 0 && strings.Contains(bar, "█") {
+			t.Fatal(bar)
+		}
+		if used == 100 && strings.Contains(bar, "-") {
+			t.Fatal(bar)
+		}
+		if used == 50 && (!strings.Contains(bar, "█") || !strings.Contains(bar, "-")) {
+			t.Fatal(bar)
+		}
+	}
+	w := quota.Window{Used: 50, ResetsAt: now.Add(75 * time.Hour)}
+	if bar := compactBar(&w, now, true); !strings.Contains(bar, "~3d 3h") {
+		t.Fatal(bar)
+	}
+	w.ResetsAt = now.Add(-time.Second)
+	if bar := compactBar(&w, now, true); strings.Contains(bar, "█") || !strings.Contains(bar, "?") {
+		t.Fatal(bar)
 	}
 }
