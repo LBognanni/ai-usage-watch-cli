@@ -2,14 +2,46 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"aiu/internal/quota"
 )
+
+// Lock serializes status/watch refreshes across processes, preventing prompt
+// refresh stampedes and lost updates when commands select different providers.
+// The project targets Linux; flock is released automatically on process exit.
+func Lock(ctx context.Context, path string) (func(), error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(path+".lock", os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0600)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); _ = f.Close() }, nil
+		}
+		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+			f.Close()
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			f.Close()
+			return nil, ctx.Err()
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+}
 
 func Path() (string, error) {
 	dir, err := os.UserCacheDir()

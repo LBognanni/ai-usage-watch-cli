@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +9,27 @@ import (
 
 	"aiu/internal/quota"
 )
+
+func TestLockTimeoutAndRelease(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	unlock, err := Lock(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if release, err := Lock(ctx, path); err == nil {
+		release()
+		unlock()
+		t.Fatal("second lock succeeded")
+	}
+	unlock()
+	release, err := Lock(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+}
 
 func TestRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "aiu", "snapshot.json")

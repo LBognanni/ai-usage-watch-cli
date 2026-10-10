@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 type Credential struct {
@@ -37,7 +38,7 @@ func identity(id, value string) string {
 func failure(status, message string) Result { return Result{Status: status, Message: message} }
 
 func Claude(path string) Result {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if errors.Is(err, os.ErrNotExist) {
 		return failure("not connected", "Sign in with Claude Code (claude auth login).")
 	}

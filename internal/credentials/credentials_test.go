@@ -60,4 +60,14 @@ func TestClaude(t *testing.T) {
 	if Claude(path).Status != "unavailable" {
 		t.Fatal("insecure credential accepted")
 	}
+	link := filepath.Join(filepath.Dir(path), "symlink")
+	if err := os.Chmod(path, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(path, link); err != nil {
+		t.Fatal(err)
+	}
+	if Claude(link).Status != "unavailable" {
+		t.Fatal("credential symlink accepted")
+	}
 }

@@ -87,3 +87,33 @@ func TestRetryAfter(t *testing.T) {
 		}
 	}
 }
+
+func TestNoRedirectCredentialForwarding(t *testing.T) {
+	client := NewClient()
+	calls := 0
+	client.HTTP.Transport = roundTripper(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if r.URL.Host != "chatgpt.com" {
+			t.Fatal("credential sent to another host")
+		}
+		return &http.Response{StatusCode: 302, Header: http.Header{"Location": []string{"https://example.com/steal"}}, Body: io.NopCloser(strings.NewReader(""))}, nil
+	})
+	got := client.Fetch(context.Background(), "openai", credentials.Credential{Token: "secret"}, time.Now())
+	if calls != 1 || got.Status != "unavailable" {
+		t.Fatal("redirect followed")
+	}
+}
+
+func TestHTTPSuccess(t *testing.T) {
+	client := NewClient()
+	client.HTTP.Transport = roundTripper(func(r *http.Request) (*http.Response, error) {
+		if r.Header.Get("ChatGPT-Account-Id") != "account" {
+			t.Fatal("missing account header")
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"plan_type":"plus","email":"private@example.com","rate_limit":{"primary_window":{"used_percent":42,"limit_window_seconds":18000}}}`))}, nil
+	})
+	got := client.Fetch(context.Background(), "openai", credentials.Credential{Token: "secret", AccountID: "account", Label: "default", Identity: "hash"}, time.Now())
+	if got.Status != "live" || got.Plan != "Plus" || len(got.Windows) != 1 || got.Windows[0].Used != 42 {
+		t.Fatal(got)
+	}
+}

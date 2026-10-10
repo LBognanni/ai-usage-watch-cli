@@ -76,8 +76,41 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	snapshot, _ := cache.Read(path) // Missing/corrupt cache is recoverable.
 	e := engine.New()
 	refresh := func(previous quota.Snapshot, staleOnly bool) quota.Snapshot {
+		if staleOnly {
+			needed := false
+			now := time.Now()
+			for _, id := range ids {
+				p := engine.Find(previous, id)
+				if !p.Fresh(now, *maxAge) && !now.Before(p.NextAttempt) {
+					needed = true
+				}
+			}
+			if !needed {
+				return previous
+			}
+		}
 		requestCtx, cancel := context.WithTimeout(ctx, *timeout)
 		defer cancel()
+		unlock, err := cache.Lock(requestCtx, path)
+		if err != nil {
+			if requestCtx.Err() == nil {
+				fmt.Fprintln(diagnostics, "aiu: cannot lock quota cache")
+			}
+			if latest, readErr := cache.Read(path); readErr == nil {
+				return latest
+			}
+			if len(previous.Providers) == 0 {
+				previous.Version = 1
+				for _, id := range ids {
+					previous.Providers = append(previous.Providers, quota.Provider{ID: id, Status: "unavailable", Message: "Quota refresh is busy or cache is inaccessible; retry shortly."})
+				}
+			}
+			return previous
+		}
+		defer unlock()
+		if latest, err := cache.Read(path); err == nil {
+			previous = latest
+		}
 		next := e.Refresh(requestCtx, previous, ids, time.Now(), *maxAge, staleOnly)
 		if err := cache.Write(path, next); err != nil {
 			fmt.Fprintln(diagnostics, "aiu: cannot save latest quota cache")
@@ -120,6 +153,9 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	for {
 		select {
 		case <-ctx.Done():
+			if busy {
+				<-results
+			}
 			return 0
 		case <-ticks.C:
 			if terminal {
