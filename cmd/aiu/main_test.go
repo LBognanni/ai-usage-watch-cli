@@ -77,3 +77,13 @@ func TestHelpAndVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildVersion(t *testing.T) {
+	previous := version
+	version = "v1.2.3"
+	t.Cleanup(func() { version = previous })
+	var out, diagnostics bytes.Buffer
+	if run(context.Background(), []string{"--version"}, &out, &diagnostics) != 0 || out.String() != "aiu v1.2.3\n" {
+		t.Fatal(out.String(), diagnostics.String())
+	}
+}

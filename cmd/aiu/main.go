@@ -17,6 +17,9 @@ import (
 	"aiu/internal/ui"
 )
 
+// Set by release builds with -ldflags "-X main.version=vX.Y.Z".
+var version = "dev"
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -35,7 +38,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	timeout := flags.Duration("timeout", 0, "overall refresh timeout (default 10s, status 2s)")
 	noColor := flags.Bool("no-color", false, "disable color")
 	cached := flags.Bool("cached", false, "read cache only, with no credential or network calls")
-	version := flags.Bool("version", false, "print version")
+	printVersion := flags.Bool("version", false, "print version")
 	flags.Usage = func() {
 		fmt.Fprintln(diagnostics, "aiu — live AI subscription quotas\n\nUsage: aiu [flags]\n\nDefault: fetch live quotas and print bars. --status shows 5-hour/weekly used percentages.")
 		flags.PrintDefaults()
@@ -46,8 +49,8 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 		}
 		return 2
 	}
-	if *version {
-		fmt.Fprintln(out, "aiu 0.1.0")
+	if *printVersion {
+		fmt.Fprintln(out, "aiu", version)
 		return 0
 	}
 	if flags.NArg() != 0 || (*watch && *status) || (*compact && *status) || (*watch && *cached) || *interval <= 0 || *maxAge <= 0 || *timeout < 0 {

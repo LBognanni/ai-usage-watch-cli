@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Lint workflows and installer
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:1.7.7
+          docker run --rm -v "$PWD:/repo:ro" -w /repo koalaman/shellcheck:v0.10.0 install.sh
       - run: make check
       - run: make build
       - run: ./dist/aiu --version
