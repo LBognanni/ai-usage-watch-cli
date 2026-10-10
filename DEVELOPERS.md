@@ -16,6 +16,7 @@ make test
 make fmt
 make check                         # formatting, go vet, tests
 make build CONTAINER=podman
+make build VERSION=v0.1.0          # embed --version without creating a tag
 ```
 
 Containers mount only the repository and a build cache, run as the host UID/GID, and do not receive provider credentials. The build cache defaults to `${XDG_CACHE_HOME:-~/.cache}/aiu-build`; override `CACHE_DIR`, `CONTAINER`, or `IMAGE` through Make variables.
@@ -35,7 +36,45 @@ In VS Code, choose **Dev Containers: Reopen in Container**. `.devcontainer/devco
 
 ### CI
 
-`.github/workflows/check.yml` runs `make check`, builds the executable, and checks `--version` on pushes and pull requests. Tests use synthetic credentials and quota responses; live accounts are not required.
+`.github/workflows/check.yml` lints workflows with actionlint and the installer with ShellCheck, runs `make check`, builds the executable, and checks `--version` on pushes and pull requests. Tests use synthetic credentials and quota responses; live accounts are not required. Installer integration tests fake downloads, exercise piped stdin, and cover architectures, version selection, checksum failures, cleanup, and preservation of existing installations.
+
+## Releases
+
+Once `.github/workflows/release.yml` is on `main`, open **Actions → Release → Run workflow**, select `main`, and enter a stable version such as `0.1.0` or `v0.1.0`.
+
+The workflow:
+
+1. Validates `main` and the version, refusing existing tags.
+2. Checks formatting/shell syntax, runs `go vet` and race-enabled tests.
+3. Cross-compiles static Linux amd64 and arm64 binaries using the pinned Go toolchain, embedding the tag in `aiu --version`.
+4. Creates `aiu_linux_amd64.tar.gz`, `aiu_linux_arm64.tar.gz`, and `SHA256SUMS`.
+5. Creates and pushes an annotated `vX.Y.Z` tag for the tested commit.
+6. Uploads assets to a draft release with generated notes, then publishes it as the latest release.
+
+Releases are serialized. Only the built-in `GITHUB_TOKEN` is needed, with `contents: write`; repository rules must permit the workflow to push version tags and publish releases. Pushing a tag alone does not run this workflow, and it never pushes changes to `main`.
+
+Build/test failures happen before tagging. If publishing fails after tag creation, a tag and/or draft release can remain. Inspect them and finish publication manually; don't overwrite an existing version with different binaries.
+
+Local builds default to `aiu dev`. Use `make build VERSION=vX.Y.Z` or `docker build --target binary --build-arg VERSION=vX.Y.Z ...` to embed a version without creating or publishing a release.
+
+### Installer
+
+`install.sh` is POSIX shell, designed for `curl | sh`. It detects Linux x86_64/arm64, downloads archives and `SHA256SUMS` over HTTPS, verifies the selected archive before extraction, and atomically replaces the executable in the installation directory. Failures preserve the existing executable; temporary directories are cleaned up. No client credentials are read.
+
+Latest release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/LBognanni/ai-usage-watch-cli/main/install.sh | sh
+```
+
+Pinned version or custom destination:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/LBognanni/ai-usage-watch-cli/main/install.sh | AIU_VERSION=v0.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/LBognanni/ai-usage-watch-cli/main/install.sh | AIU_INSTALL_DIR="$HOME/bin" sh
+```
+
+The checksum protects download integrity, not against a compromised release publisher; users must trust this repository. Because latest archive/checksum downloads are separate requests, a concurrent new release can cause a safe verification failure—retry or pin a version. The public installer URL requires these files to be pushed and at least one release to be published.
 
 ## Code layout
 

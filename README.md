@@ -38,14 +38,15 @@ Examples use illustrative values. `?` means unknown, not zero; `~` marks an olde
 
 ## Get started
 
-Build with Docker and Make—no Go installation needed:
+Install the latest release (Linux x86_64 or arm64; requires `curl`, `tar`, and `sha256sum`):
 
 ```sh
-make build
-install -Dm755 dist/aiu ~/.local/bin/aiu
+curl -fsSL https://raw.githubusercontent.com/LBognanni/ai-usage-watch-cli/main/install.sh | sh
 ```
 
-Ensure `~/.local/bin` is in your `PATH`. Or run `./dist/aiu` directly.
+The installer verifies the download and installs to `~/.local/bin` without sudo. Ensure that directory is in your `PATH`. Run the same command to update. It becomes available once the first GitHub release is published.
+
+Prefer not to pipe a script into your shell? Download a binary from [Releases](https://github.com/LBognanni/ai-usage-watch-cli/releases), or [build it yourself](DEVELOPERS.md#build-and-test).
 
 Sign into your existing clients:
 
