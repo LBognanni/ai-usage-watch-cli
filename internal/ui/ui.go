@@ -81,13 +81,7 @@ func Display(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 			filled := int(math.Round(used / 5))
 			bar := strings.Repeat("█", filled) + strings.Repeat("░", 20-filled)
 			if color {
-				code := "32"
-				if used >= 90 {
-					code = "31"
-				} else if used >= 70 {
-					code = "33"
-				}
-				bar = "\x1b[" + code + "m" + bar + "\x1b[0m"
+				bar = colorUsage(bar, used)
 			}
 			reset := "reset unknown"
 			if !w.ResetsAt.IsZero() {
@@ -124,7 +118,7 @@ func Display(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 
 // Compact shows only provider/plan names and the main quota bars. Countdown
 // text overlays the bar; no percentages, extra windows, or footer are emitted.
-func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration) string {
+func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration, color bool) string {
 	var b strings.Builder
 	rows := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
 	for _, id := range ids {
@@ -150,7 +144,11 @@ func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 					break
 				}
 			}
-			cells = append(cells, compactBar(window, now, stale))
+			bar := compactBar(window, now, stale)
+			if color && window != nil && validWindow(*window, now) {
+				bar = colorUsage(bar, window.Used)
+			}
+			cells = append(cells, bar)
 		}
 		fmt.Fprintf(rows, "%s\t%s\n", header, strings.Join(cells, " "))
 	}
@@ -160,7 +158,7 @@ func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 
 func compactBar(w *quota.Window, now time.Time, stale bool) string {
 	const width = 20
-	bar := []rune(strings.Repeat("-", width))
+	bar := []rune(strings.Repeat("░", width))
 	text := "?"
 	if w != nil && validWindow(*w, now) {
 		filled := int(math.Round(math.Max(0, math.Min(100, w.Used)) * width / 100))
@@ -186,6 +184,16 @@ func compactBar(w *quota.Window, now time.Time, stale bool) string {
 	}
 	copy(bar[(width-len(label))/2:], label)
 	return "[" + string(bar) + "]"
+}
+
+func colorUsage(bar string, used float64) string {
+	code := "32"
+	if used >= 90 {
+		code = "31"
+	} else if used >= 70 {
+		code = "33"
+	}
+	return "\x1b[" + code + "m" + bar + "\x1b[0m"
 }
 
 func freshnessFooter(s quota.Snapshot, ids []string, now time.Time) string {

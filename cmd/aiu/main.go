@@ -132,7 +132,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 			fmt.Fprint(out, "\x1b[H\x1b[2J")
 		}
 		if *compact {
-			fmt.Fprint(out, ui.Compact(snapshot, ids, time.Now(), *maxAge))
+			fmt.Fprint(out, ui.Compact(snapshot, ids, time.Now(), *maxAge, color))
 		} else {
 			fmt.Fprint(out, ui.Display(snapshot, ids, time.Now(), *maxAge, color))
 		}

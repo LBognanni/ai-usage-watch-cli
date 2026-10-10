@@ -73,14 +73,16 @@ updated 2m ago (oldest reading)
 Compact view (`--compact`; countdowns are embedded in usage bars):
 
 ```text
-Claude Pro        [███████-2:18--------] [███████3d 4h--------]
-OpenAI Plus       [███-----4:06--------] [██████5d 11h--------]
-Copilot Business  [█████-21d 0h--------]
+Claude Pro        [███████░2:18░░░░░░░░] [███████3d 4h░░░░░░░░]
+OpenAI Plus       [███░░░░░4:06░░░░░░░░] [██████5d 11h░░░░░░░░]
+Copilot Business  [█████░21d 0h░░░░░░░░]
 ```
 
 Compact mode shows **only provider/plan names and bars**: 5-hour then weekly for Claude/OpenAI, monthly for Copilot. Filled cells indicate percentage used; overlaid countdowns use `H:MM` below 24 hours and `Dd Hh` otherwise. Missing or elapsed windows show `?` inside an unfilled bar; `~` marks stale readings. Account labels, additional model windows, percentages, errors, timestamps, and watch instructions are omitted—use the normal view for details. `--compact` works with `--watch`, `--cached`, and provider selection; it cannot be combined with `--status`.
 
 The normal bar view uses one freshness footer rather than repeating timestamps under healthy providers. Each provider retains its own timestamp internally; stale rows show their individual age and failure state. The footer refers to the oldest displayed reading, not the last refresh attempt.
+
+Compact bars use the same `█`/`░` fill and terminal colors as the normal view: green below 70%, yellow from 70%, red from 90%. `--no-color` and `NO_COLOR` disable colors in both views.
 
 Prompt/status output (`--status`):
 
