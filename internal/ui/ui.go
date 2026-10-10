@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"text/tabwriter"
 	"time"
 	"unicode"
 
@@ -109,17 +110,96 @@ func Display(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 			}
 			b.WriteString("\n")
 		}
-		if len(p.Windows) > 0 {
-			if stale {
-				b.WriteString("  stale · ")
-			} else {
-				b.WriteString("  ")
-			}
+		if len(p.Windows) > 0 && stale {
+			b.WriteString("  stale · ")
 			b.WriteString(age(p, now))
 			b.WriteString("\n")
 		}
 	}
+	if footer := freshnessFooter(s, ids, now); footer != "" {
+		b.WriteString("\n" + footer)
+	}
 	return b.String()
+}
+
+// Compact keeps all reported windows and account labels, but removes bars and
+// per-provider healthy timestamps. Parentheses contain reset countdowns.
+func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration) string {
+	var b strings.Builder
+	rows := tabwriter.NewWriter(&b, 0, 4, 2, ' ', 0)
+	for _, id := range ids {
+		p := engine.Find(s, id)
+		header := quota.Name(id)
+		var labels []string
+		if p.Plan != "" {
+			labels = append(labels, Clean(p.Plan))
+		}
+		if p.Label != "" {
+			labels = append(labels, Clean(p.Label))
+		}
+		if len(labels) > 0 {
+			header += " (" + strings.Join(labels, " · ") + ")"
+		}
+		var cells []string
+		stale := !p.Fresh(now, maxAge)
+		for _, w := range p.Windows {
+			label := Clean(w.Label)
+			switch label {
+			case "5-hour":
+				label = "5h"
+			case "Weekly":
+				label = "week"
+			case "Monthly":
+				label = "month"
+			}
+			if !validWindow(w, now) {
+				cells = append(cells, label+" ? (elapsed)")
+				continue
+			}
+			prefix := ""
+			if stale {
+				prefix = "~"
+			}
+			reset := "reset unknown"
+			if !w.ResetsAt.IsZero() {
+				reset = duration(w.ResetsAt.Sub(now))
+			}
+			cells = append(cells, fmt.Sprintf("%s %s%.1f%% (%s)", label, prefix, w.Used, reset))
+		}
+		if stale && len(p.Windows) > 0 {
+			state := "stale"
+			if p.Status != "live" {
+				state += ": " + Clean(p.Status)
+			}
+			cells = append(cells, state+" · "+age(p, now))
+		} else if p.Status != "live" {
+			state := Clean(p.Status)
+			if p.Message != "" {
+				state += " — " + Clean(p.Message)
+			}
+			cells = append(cells, state)
+		}
+		fmt.Fprintf(rows, "%s\t%s\n", header, strings.Join(cells, " · "))
+	}
+	_ = rows.Flush()
+	if footer := freshnessFooter(s, ids, now); footer != "" {
+		b.WriteString("\n" + footer)
+	}
+	return b.String()
+}
+
+func freshnessFooter(s quota.Snapshot, ids []string, now time.Time) string {
+	var oldest time.Time
+	for _, id := range ids {
+		p := engine.Find(s, id)
+		if len(p.Windows) > 0 && !p.CheckedAt.IsZero() && (oldest.IsZero() || p.CheckedAt.Before(oldest)) {
+			oldest = p.CheckedAt
+		}
+	}
+	if oldest.IsZero() {
+		return ""
+	}
+	return age(quota.Provider{CheckedAt: oldest}, now) + " (oldest reading)\n"
 }
 
 func Status(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration) string {

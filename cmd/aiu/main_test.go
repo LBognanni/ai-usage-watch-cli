@@ -13,11 +13,27 @@ import (
 )
 
 func TestFlags(t *testing.T) {
-	for _, args := range [][]string{{"--watch", "--status"}, {"--interval=0"}, {"--provider=wrong"}, {"--timeout=-1s"}, {"extra"}, {"--watch", "--interval=1s"}} {
+	for _, args := range [][]string{{"--watch", "--status"}, {"--compact", "--status"}, {"--interval=0"}, {"--provider=wrong"}, {"--timeout=-1s"}, {"extra"}, {"--watch", "--interval=1s"}} {
 		var out, err bytes.Buffer
 		if run(context.Background(), args, &out, &err) != 2 {
 			t.Fatal(args)
 		}
+	}
+}
+
+func TestCachedCompact(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", dir)
+	s := quota.Snapshot{Version: 1, Providers: []quota.Provider{{ID: "openai", Plan: "Plus", Label: "default", Status: "live", CheckedAt: time.Now(), Windows: []quota.Window{{Label: "Weekly", Used: 34}}}}}
+	if err := cache.Write(filepath.Join(dir, "aiu", "snapshot.json"), s); err != nil {
+		t.Fatal(err)
+	}
+	var out, diagnostics bytes.Buffer
+	if run(context.Background(), []string{"--compact", "--cached", "--provider=openai"}, &out, &diagnostics) != 0 {
+		t.Fatal(diagnostics.String())
+	}
+	if !strings.Contains(out.String(), "OpenAI (Plus · default)") || !strings.Contains(out.String(), "week 34.0%") || strings.Contains(out.String(), "Claude") {
+		t.Fatal(out.String())
 	}
 }
 

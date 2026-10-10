@@ -28,6 +28,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	flags.SetOutput(diagnostics)
 	watch := flags.Bool("watch", false, "watch quota bars; refresh every interval")
 	status := flags.Bool("status", false, "compact line; refresh stale cache (2s default timeout)")
+	compact := flags.Bool("compact", false, "one row per provider with usage and reset countdowns")
 	providers := flags.String("provider", "claude,openai,copilot", "comma-separated providers")
 	interval := flags.Duration("interval", 5*time.Minute, "watch network refresh interval")
 	maxAge := flags.Duration("max-age", 5*time.Minute, "maximum cache age for status output")
@@ -49,7 +50,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 		fmt.Fprintln(out, "aiu 0.1.0")
 		return 0
 	}
-	if flags.NArg() != 0 || (*watch && *status) || (*watch && *cached) || *interval <= 0 || *maxAge <= 0 || *timeout < 0 {
+	if flags.NArg() != 0 || (*watch && *status) || (*compact && *status) || (*watch && *cached) || *interval <= 0 || *maxAge <= 0 || *timeout < 0 {
 		fmt.Fprintln(diagnostics, "aiu: invalid arguments; use --help")
 		return 2
 	}
@@ -130,7 +131,11 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 		if *watch && terminal {
 			fmt.Fprint(out, "\x1b[H\x1b[2J")
 		}
-		fmt.Fprint(out, ui.Display(snapshot, ids, time.Now(), *maxAge, color))
+		if *compact {
+			fmt.Fprint(out, ui.Compact(snapshot, ids, time.Now(), *maxAge))
+		} else {
+			fmt.Fprint(out, ui.Display(snapshot, ids, time.Now(), *maxAge, color))
+		}
 		if *watch {
 			fmt.Fprintf(out, "\nRefreshing every %s · Ctrl-C to exit\n", *interval)
 		}

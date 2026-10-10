@@ -45,6 +45,8 @@ For OpenAI and Copilot, `opencode` must be on `PATH`. `aiu` invokes `opencode ap
 ```sh
 aiu                                  # live read, quota bars
 aiu --watch                          # refresh every 5 minutes; Ctrl-C exits
+aiu --compact                        # one row per provider; no bars
+aiu --compact --watch                # compact live monitor
 aiu --status                         # compact line, refresh only if stale
 aiu --status --cached                 # instant cache-only output
 aiu --provider claude,openai          # select providers
@@ -60,15 +62,27 @@ Example (illustrative values):
 Claude · Pro · Claude Code
   5-hour                 ███████░░░░░░░░░░░░░  34.0% used  resets in 2h 18m
   Weekly                 ███████████░░░░░░░░░  53.0% used  resets Tue Nov 3 09:00 CET
-  updated 2m ago
 
 OpenAI · Plus · default
   5-hour                 ███░░░░░░░░░░░░░░░░░  14.0% used  resets in 4h 06m
   Weekly                 ████████░░░░░░░░░░░░  39.0% used  resets Thu Nov 5 16:20 CET
-  updated 2m ago
+
+updated 2m ago (oldest reading)
 ```
 
-Compact output:
+Compact view (`--compact`; parentheses show time until reset):
+
+```text
+Claude (Pro · Claude Code)  5h 34.0% (2h 18m) · week 53.0% (3d 4h)
+OpenAI (Plus · default)    5h 14.0% (4h 06m) · week 39.0% (5d 11h)
+GitHub Copilot (Business)  month 24.0% (21d 0h)
+
+updated 2m ago (oldest reading)
+```
+
+Both multi-line views use one freshness footer rather than repeating timestamps under healthy providers. Each provider retains its own timestamp internally; stale rows show their individual age and failure state. The footer refers to the oldest displayed reading, not the last refresh attempt. `--compact` works with `--watch`, `--cached`, and provider selection; it cannot be combined with `--status`.
+
+Prompt/status output (`--status`):
 
 ```text
 Claude 34/53% · OpenAI 14/39% · Copilot 24% · updated 2m ago
