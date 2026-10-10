@@ -1,0 +1,20 @@
+{
+  "name": "aiu",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "dev"
+  },
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"]
+    }
+  },
+  "containerEnv": {
+    "CGO_ENABLED": "0"
+  }
+}
