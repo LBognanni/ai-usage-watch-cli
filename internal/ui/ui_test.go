@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,30 @@ func TestStatusOrderingAndMissingWindows(t *testing.T) {
 	want := "Claude ?/42% · OpenAI 7/31% · Copilot not connected · updated <1m ago\n"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestCountdownBackgroundCrossesFillBoundary(t *testing.T) {
+	now := time.Now()
+	w := quota.Window{Used: 50, ResetsAt: now.Add(3*time.Hour + 33*time.Minute)}
+	bar := compactBar(&w, now, false, true)
+	// At 50%, the first two countdown characters sit on the consumed green
+	// region; the last two sit on the remaining gray region.
+	if !strings.Contains(bar, "\x1b[30;42m3:\x1b[97;100m33") {
+		t.Fatal(bar)
+	}
+	strip := regexp.MustCompile(`\x1b\[[0-9;]+m`)
+	if strip.ReplaceAllString(bar, "") != compactBar(&w, now, false, false) {
+		t.Fatal("color changed visible content or width")
+	}
+	for _, tt := range []struct {
+		used  float64
+		style string
+	}{{0, "\x1b[97;100m3:33"}, {100, "\x1b[30;41m3:33"}} {
+		w.Used = tt.used
+		if bar := compactBar(&w, now, false, true); !strings.Contains(bar, tt.style) {
+			t.Fatal(bar)
+		}
 	}
 }
 
@@ -88,7 +113,7 @@ func TestCompactBar(t *testing.T) {
 	now := time.Now()
 	for _, used := range []float64{0, 50, 100} {
 		w := quota.Window{Used: used, ResetsAt: now.Add(3*time.Hour + 33*time.Minute)}
-		bar := compactBar(&w, now, false)
+		bar := compactBar(&w, now, false, false)
 		if len([]rune(bar)) != 22 || !strings.Contains(bar, "3:33") {
 			t.Fatal(bar)
 		}
@@ -103,11 +128,11 @@ func TestCompactBar(t *testing.T) {
 		}
 	}
 	w := quota.Window{Used: 50, ResetsAt: now.Add(75 * time.Hour)}
-	if bar := compactBar(&w, now, true); !strings.Contains(bar, "~3d 3h") {
+	if bar := compactBar(&w, now, true, false); !strings.Contains(bar, "~3d 3h") {
 		t.Fatal(bar)
 	}
 	w.ResetsAt = now.Add(-time.Second)
-	if bar := compactBar(&w, now, true); strings.Contains(bar, "█") || !strings.Contains(bar, "?") {
+	if bar := compactBar(&w, now, true, false); strings.Contains(bar, "█") || !strings.Contains(bar, "?") {
 		t.Fatal(bar)
 	}
 }
@@ -119,10 +144,13 @@ func TestCompactColorsMatchFullView(t *testing.T) {
 		code string
 	}{{20, "32"}, {75, "33"}, {95, "31"}} {
 		s := quota.Snapshot{Providers: []quota.Provider{{ID: "claude", Status: "live", CheckedAt: now, Windows: []quota.Window{{Label: "5-hour", Used: tt.used, ResetsAt: now.Add(time.Hour)}}}}}
-		for _, output := range []string{Compact(s, []string{"claude"}, now, time.Minute, true), Display(s, []string{"claude"}, now, time.Minute, true)} {
-			if !strings.Contains(output, "\x1b["+tt.code+"m") || !strings.Contains(output, "\x1b[0m") {
-				t.Fatal(output)
-			}
+		compact := Compact(s, []string{"claude"}, now, time.Minute, true)
+		if !strings.Contains(compact, "\x1b["+tt.code+";") || !strings.Contains(compact, "\x1b[0m") {
+			t.Fatal(compact)
+		}
+		full := Display(s, []string{"claude"}, now, time.Minute, true)
+		if !strings.Contains(full, "\x1b["+tt.code+"m") {
+			t.Fatal(full)
 		}
 		plain := Compact(s, []string{"claude"}, now, time.Minute, false)
 		if strings.Contains(plain, "\x1b") || strings.Contains(plain, "-") || !strings.Contains(plain, "░") {

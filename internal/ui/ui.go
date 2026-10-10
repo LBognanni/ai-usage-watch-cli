@@ -144,10 +144,7 @@ func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 					break
 				}
 			}
-			bar := compactBar(window, now, stale)
-			if color && window != nil && validWindow(*window, now) {
-				bar = colorUsage(bar, window.Used)
-			}
+			bar := compactBar(window, now, stale, color)
 			cells = append(cells, bar)
 		}
 		fmt.Fprintf(rows, "%s\t%s\n", header, strings.Join(cells, " "))
@@ -156,12 +153,15 @@ func Compact(s quota.Snapshot, ids []string, now time.Time, maxAge time.Duration
 	return b.String()
 }
 
-func compactBar(w *quota.Window, now time.Time, stale bool) string {
+func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 	const width = 20
 	bar := []rune(strings.Repeat("░", width))
 	text := "?"
+	filled := 0
+	used := 0.0
 	if w != nil && validWindow(*w, now) {
-		filled := int(math.Round(math.Max(0, math.Min(100, w.Used)) * width / 100))
+		used = w.Used
+		filled = int(math.Round(math.Max(0, math.Min(100, used)) * width / 100))
 		for i := 0; i < filled; i++ {
 			bar[i] = '█'
 		}
@@ -182,18 +182,51 @@ func compactBar(w *quota.Window, now time.Time, stale bool) string {
 	if len(label) > width {
 		label = label[:width]
 	}
-	copy(bar[(width-len(label))/2:], label)
-	return "[" + string(bar) + "]"
+	start := (width - len(label)) / 2
+	copy(bar[start:], label)
+	if !color {
+		return "[" + string(bar) + "]"
+	}
+	var b strings.Builder
+	b.WriteByte('[')
+	previous := ""
+	for i, cell := range bar {
+		// Every cell retains its underlying usage background, including text
+		// cells. Change the foreground only to keep the label readable.
+		fg, bg := 90, 100
+		if i < filled {
+			fg = usageColor(used)
+			bg = fg + 10
+		}
+		if i >= start && i < start+len(label) {
+			fg = 97
+			if i < filled {
+				fg = 30
+			}
+		}
+		style := fmt.Sprintf("\x1b[%d;%dm", fg, bg)
+		if style != previous {
+			b.WriteString(style)
+			previous = style
+		}
+		b.WriteRune(cell)
+	}
+	b.WriteString("\x1b[0m]")
+	return b.String()
 }
 
 func colorUsage(bar string, used float64) string {
-	code := "32"
+	return fmt.Sprintf("\x1b[%dm%s\x1b[0m", usageColor(used), bar)
+}
+
+func usageColor(used float64) int {
+	code := 32
 	if used >= 90 {
-		code = "31"
+		code = 31
 	} else if used >= 70 {
-		code = "33"
+		code = 33
 	}
-	return "\x1b[" + code + "m" + bar + "\x1b[0m"
+	return code
 }
 
 func freshnessFooter(s quota.Snapshot, ids []string, now time.Time) string {

@@ -82,7 +82,7 @@ Compact mode shows **only provider/plan names and bars**: 5-hour then weekly for
 
 The normal bar view uses one freshness footer rather than repeating timestamps under healthy providers. Each provider retains its own timestamp internally; stale rows show their individual age and failure state. The footer refers to the oldest displayed reading, not the last refresh attempt.
 
-Compact bars use the same `█`/`░` fill and terminal colors as the normal view: green below 70%, yellow from 70%, red from 90%. `--no-color` and `NO_COLOR` disable colors in both views.
+Compact bars use the same `█`/`░` fill and terminal colors as the normal view: green below 70%, yellow from 70%, red from 90%. Countdown text sits on the underlying used/remaining background, even across the fill boundary. `--no-color` and `NO_COLOR` disable colors in both views; without color, text uses a character overlay instead.
 
 Prompt/status output (`--status`):
 
