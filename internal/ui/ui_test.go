@@ -24,8 +24,8 @@ func TestCountdownBackgroundCrossesFillBoundary(t *testing.T) {
 	w := quota.Window{Used: 50, ResetsAt: now.Add(3*time.Hour + 33*time.Minute)}
 	bar := compactBar(&w, now, false, true)
 	// At 50%, the first two countdown characters sit on the consumed green
-	// region; the last two sit on the remaining gray region.
-	if !strings.Contains(bar, "\x1b[30;42m3:\x1b[97;100m33") {
+	// region; the last two sit on the remaining dark region.
+	if !strings.Contains(bar, "\x1b[30;42m3:\x1b[97;40m33") {
 		t.Fatal(bar)
 	}
 	strip := regexp.MustCompile(`\x1b\[[0-9;]+m`)
@@ -35,7 +35,7 @@ func TestCountdownBackgroundCrossesFillBoundary(t *testing.T) {
 	for _, tt := range []struct {
 		used  float64
 		style string
-	}{{0, "\x1b[97;100m3:33"}, {100, "\x1b[30;41m3:33"}} {
+	}{{0, "\x1b[97;40m3:33"}, {100, "\x1b[30;41m3:33"}} {
 		w.Used = tt.used
 		if bar := compactBar(&w, now, false, true); !strings.Contains(bar, tt.style) {
 			t.Fatal(bar)
@@ -75,7 +75,7 @@ func TestCompact(t *testing.T) {
 			t.Fatalf("missing %q in %s", want, got)
 		}
 	}
-	if strings.Count(got, "[") != 5 || strings.Count(got, "\n") != 3 || strings.ContainsAny(got, "%\x1b") {
+	if strings.Count(got, "\n") != 3 || strings.ContainsAny(got, "[]%\x1b") {
 		t.Fatal(got)
 	}
 	for _, forbidden := range []string{"updated", "Claude Code", "default", "Spark", "not connected", "reset", "week"} {
@@ -114,7 +114,7 @@ func TestCompactBar(t *testing.T) {
 	for _, used := range []float64{0, 50, 100} {
 		w := quota.Window{Used: used, ResetsAt: now.Add(3*time.Hour + 33*time.Minute)}
 		bar := compactBar(&w, now, false, false)
-		if len([]rune(bar)) != 22 || !strings.Contains(bar, "3:33") {
+		if len([]rune(bar)) != 20 || !strings.Contains(bar, "3:33") {
 			t.Fatal(bar)
 		}
 		if used == 0 && strings.Contains(bar, "█") {

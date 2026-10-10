@@ -185,15 +185,14 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 	start := (width - len(label)) / 2
 	copy(bar[start:], label)
 	if !color {
-		return "[" + string(bar) + "]"
+		return string(bar)
 	}
 	var b strings.Builder
-	b.WriteByte('[')
 	previous := ""
 	for i, cell := range bar {
 		// Every cell retains its underlying usage background, including text
 		// cells. Change the foreground only to keep the label readable.
-		fg, bg := 90, 100
+		fg, bg := 90, 40
 		if i < filled {
 			fg = usageColor(used)
 			bg = fg + 10
@@ -211,7 +210,7 @@ func compactBar(w *quota.Window, now time.Time, stale, color bool) string {
 		}
 		b.WriteRune(cell)
 	}
-	b.WriteString("\x1b[0m]")
+	b.WriteString("\x1b[0m")
 	return b.String()
 }
 

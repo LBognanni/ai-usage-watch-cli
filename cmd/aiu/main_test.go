@@ -32,7 +32,7 @@ func TestCachedCompact(t *testing.T) {
 	if run(context.Background(), []string{"--compact", "--cached", "--provider=openai"}, &out, &diagnostics) != 0 {
 		t.Fatal(diagnostics.String())
 	}
-	if !strings.Contains(out.String(), "OpenAI Plus") || !strings.Contains(out.String(), "[") || strings.Contains(out.String(), "default") || strings.Contains(out.String(), "%") || strings.Contains(out.String(), "Claude") {
+	if !strings.Contains(out.String(), "OpenAI Plus") || !strings.Contains(out.String(), "░") || strings.ContainsAny(out.String(), "[]%") || strings.Contains(out.String(), "default") || strings.Contains(out.String(), "Claude") {
 		t.Fatal(out.String())
 	}
 }
