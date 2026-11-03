@@ -32,6 +32,7 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	watch := flags.Bool("watch", false, "watch quota bars; refresh every interval")
 	status := flags.Bool("status", false, "compact line; refresh stale cache (2s default timeout)")
 	compact := flags.Bool("compact", false, "provider/plan and bars with reset countdowns inside")
+	to := flags.Bool("to", false, "shortcut for --compact --watch")
 	providers := flags.String("provider", "claude,openai,copilot", "comma-separated providers")
 	interval := flags.Duration("interval", 5*time.Minute, "watch network refresh interval")
 	maxAge := flags.Duration("max-age", 5*time.Minute, "maximum cache age for status output")
@@ -52,6 +53,9 @@ func run(ctx context.Context, args []string, out, diagnostics io.Writer) int {
 	if *printVersion {
 		fmt.Fprintln(out, "aiu", version)
 		return 0
+	}
+	if *to {
+		*compact, *watch = true, true
 	}
 	if flags.NArg() != 0 || (*watch && *status) || (*compact && *status) || (*watch && *cached) || *interval <= 0 || *maxAge <= 0 || *timeout < 0 {
 		fmt.Fprintln(diagnostics, "aiu: invalid arguments; use --help")

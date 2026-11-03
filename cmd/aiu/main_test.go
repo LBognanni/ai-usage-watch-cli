@@ -13,7 +13,7 @@ import (
 )
 
 func TestFlags(t *testing.T) {
-	for _, args := range [][]string{{"--watch", "--status"}, {"--compact", "--status"}, {"--interval=0"}, {"--provider=wrong"}, {"--timeout=-1s"}, {"extra"}, {"--watch", "--interval=1s"}} {
+	for _, args := range [][]string{{"--watch", "--status"}, {"--compact", "--status"}, {"--interval=0"}, {"--provider=wrong"}, {"--timeout=-1s"}, {"extra"}, {"--watch", "--interval=1s"}, {"-to", "--status"}, {"-to", "--cached"}, {"-to", "--interval=1s"}} {
 		var out, err bytes.Buffer
 		if run(context.Background(), args, &out, &err) != 2 {
 			t.Fatal(args)
@@ -38,17 +38,21 @@ func TestCachedCompact(t *testing.T) {
 }
 
 func TestCompactWatchHasNoInstructions(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CACHE_HOME", dir)
-	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	var out, diagnostics bytes.Buffer
-	if run(ctx, []string{"--compact", "--watch", "--provider=claude"}, &out, &diagnostics) != 0 {
-		t.Fatal(diagnostics.String())
-	}
-	if strings.Count(out.String(), "\n") != 1 || !strings.HasPrefix(out.String(), "Claude") || strings.Contains(out.String(), "Refreshing") {
-		t.Fatal(out.String())
+	for _, args := range [][]string{{"--compact", "--watch"}, {"-to"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("XDG_CACHE_HOME", dir)
+			t.Setenv("CLAUDE_CONFIG_DIR", dir)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			var out, diagnostics bytes.Buffer
+			if run(ctx, append(args, "--provider=claude"), &out, &diagnostics) != 0 {
+				t.Fatal(diagnostics.String())
+			}
+			if strings.Count(out.String(), "\n") != 1 || !strings.HasPrefix(out.String(), "Claude") || strings.Contains(out.String(), "Refreshing") {
+				t.Fatal(out.String())
+			}
+		})
 	}
 }
 
